@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Daily 5</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --border: #1e1e2e;
+    --accent: #c8f135;
+    --accent-dim: #9ab828;
+    --text: #f0f0f5;
+    --muted: #5a5a72;
+    --done-bg: #1a2200;
+    --done-border: #3d5200;
+    --warn: #ff5c3a;
+    --radius: 20px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    padding-top: var(--safe-top);
+    padding-bottom: calc(var(--safe-bottom) + 16px);
+  }
+
+  .app {
+    max-width: 430px;
+    margin: 0 auto;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .bg-glow {
+    position: fixed;
+    top: -100px; left: 50%;
+    transform: translateX(-50%);
+    width: 300px; height: 300px;
+    background: radial-gradient(circle, rgba(200,241,53,0.07) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+    transition: all 1s ease;
+  }
+  .bg-glow.complete { background: radial-gradient(circle, rgba(200,241,53,0.18) 0%, transparent 70%); }
+
+  header {
+    padding: 28px 24px 0;
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+
+  .date-label {
+    font-size: 12px; font-weight: 500;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 4px;
+  }
+
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 32px; font-weight: 800;
+    color: var(--text); line-height: 1.1;
+  }
+  h1 span { color: var(--accent); }
+
+  /* Notification bell */
+  .notif-btn {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 14px;
+    padding: 10px 12px;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+    font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    color: var(--muted);
+    transition: all 0.2s;
+    flex-shrink: 0; margin-top: 4px;
+    position: relative; z-index: 1;
+  }
+  .notif-btn:active { transform: scale(0.95); }
+  .notif-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(200,241,53,0.08); }
+  .notif-btn .bell { font-size: 16px; }
+
+  /* Notification panel */
+  .notif-panel {
+    margin: 12px 16px 0;
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.4s cubic-bezier(0.4,0,0.2,1), opacity 0.3s;
+    opacity: 0;
+    position: relative; z-index: 1;
+  }
+  .notif-panel.open { max-height: 360px; opacity: 1; }
+  .notif-inner { padding: 18px; }
+  .notif-inner h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 15px; font-weight: 700;
+    margin-bottom: 6px; color: var(--text);
+  }
+  .notif-inner p {
+    font-size: 12px; color: var(--muted);
+    line-height: 1.6; margin-bottom: 14px;
+  }
+  .notif-inner p strong { color: var(--accent); }
+  .time-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .time-label { font-size: 13px; color: var(--muted); flex-shrink: 0; }
+  .time-input {
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px; padding: 8px 12px; flex: 1;
+    outline: none; -webkit-appearance: none;
+    color-scheme: dark;
+  }
+  .time-input:focus { border-color: var(--accent); }
+  .notif-actions { display: flex; gap: 8px; }
+  .btn-enable {
+    flex: 1; background: var(--accent); color: var(--bg);
+    border: none; border-radius: 12px; padding: 12px;
+    font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px;
+    cursor: pointer; transition: opacity 0.2s;
+  }
+  .btn-enable:active { opacity: 0.8; }
+  .btn-disable {
+    background: transparent; color: var(--muted);
+    border: 1.5px solid var(--border);
+    border-radius: 12px; padding: 12px 16px;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; cursor: pointer;
+  }
+  .notif-status {
+    margin-top: 10px; font-size: 12px;
+    padding: 8px 12px; border-radius: 8px; display: none;
+    line-height: 1.5;
+  }
+  .notif-status.ok  { background: rgba(200,241,53,0.1); color: var(--accent); display: block; }
+  .notif-status.err { background: rgba(255,92,58,0.1);  color: var(--warn);   display: block; }
+
+  /* Progress ring */
+  .progress-section {
+    padding: 20px 24px 0;
+    position: relative; z-index: 1;
+    display: flex; align-items: center; gap: 20px;
+  }
+  .ring-wrap { flex-shrink: 0; position: relative; width: 80px; height: 80px; }
+  .ring-wrap svg { transform: rotate(-90deg); }
+  .ring-bg  { fill: none; stroke: var(--border); stroke-width: 5; }
+  .ring-fill {
+    fill: none; stroke: var(--accent); stroke-width: 5; stroke-linecap: round;
+    stroke-dasharray: 220; stroke-dashoffset: 220;
+    transition: stroke-dashoffset 0.6s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .ring-count {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .ring-count .num  { font-family:'Syne',sans-serif; font-size:22px; font-weight:800; color:var(--accent); line-height:1; }
+  .ring-count .denom { font-size:11px; color:var(--muted); font-weight:500; }
+  .progress-text { flex: 1; }
+  .progress-text .headline { font-family:'Syne',sans-serif; font-size:17px; font-weight:700; color:var(--text); margin-bottom:4px; }
+  .progress-text .sub { font-size:13px; color:var(--muted); line-height:1.4; }
+
+  /* Tasks */
+  .tasks { padding: 16px; flex: 1; position: relative; z-index: 1; }
+
+  .task-card {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+    display: flex; align-items: center;
+    padding: 18px 16px;
+    cursor: pointer;
+    transition: background 0.3s, border-color 0.3s, transform 0.15s;
+    user-select: none; position: relative; overflow: hidden;
+    min-height: 76px; -webkit-touch-callout: none;
+  }
+
+  /* Continuous pulse on incomplete cards — orange glow */
+  @keyframes card-pulse {
+    0%   { border-color: #1e1e2e;               box-shadow: 0 0 0px  rgba(255,92,58,0); }
+    50%  { border-color: rgba(255,92,58,0.65);  box-shadow: 0 0 14px rgba(255,92,58,0.22); }
+    100% { border-color: #1e1e2e;               box-shadow: 0 0 0px  rgba(255,92,58,0); }
+  }
+
+  .task-card.pulsing { animation: card-pulse 2.4s ease-in-out infinite; }
+  /* Stagger so cards don't all flash at once */
+  .task-card.pulsing:nth-child(1) { animation-delay: 0.0s; }
+  .task-card.pulsing:nth-child(2) { animation-delay: 0.48s; }
+  .task-card.pulsing:nth-child(3) { animation-delay: 0.96s; }
+  .task-card.pulsing:nth-child(4) { animation-delay: 1.44s; }
+  .task-card.pulsing:nth-child(5) { animation-delay: 1.92s; }
+
+  .task-card::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(120deg, rgba(200,241,53,0) 0%, rgba(200,241,53,0.06) 100%);
+    opacity: 0; transition: opacity 0.4s; pointer-events: none;
+  }
+  .task-card:active { transform: scale(0.975); }
+  .task-card.done {
+    background: var(--done-bg);
+    border-color: var(--done-border) !important;
+    box-shadow: none !important;
+    animation: none !important;
+  }
+  .task-card.done::after { opacity: 1; }
+
+  /* Green done bar */
+  .accent-bar {
+    position: absolute; left: 0; top: 10%; bottom: 10%;
+    width: 3px; border-radius: 0 2px 2px 0;
+    background: var(--accent);
+    transform: scaleY(0);
+    transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .task-card.done .accent-bar { transform: scaleY(1); }
+
+  /* Orange urgency bar */
+  .urgency-bar {
+    position: absolute; left: 0; top: 10%; bottom: 10%;
+    width: 3px; border-radius: 0 2px 2px 0;
+    background: var(--warn); opacity: 0;
+    transition: opacity 0.5s;
+  }
+  .task-card.pulsing .urgency-bar { opacity: 0.8; }
+
+  .check-circle {
+    width: 44px; height: 44px; border-radius: 50%;
+    border: 2px solid #2a2a3a; background: transparent;
+    flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    margin-right: 14px;
+    transition: all 0.35s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .task-card.done .check-circle {
+    border-color: var(--accent); background: var(--accent);
+    box-shadow: 0 0 16px rgba(200,241,53,0.3);
+  }
+  .check-icon {
+    width: 18px; height: 18px;
+    stroke: var(--bg); stroke-width: 2.5;
+    stroke-linecap: round; stroke-linejoin: round;
+    fill: none; opacity: 0; transform: scale(0.5);
+    transition: opacity 0.2s 0.1s, transform 0.3s 0.1s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .task-card.done .check-icon { opacity: 1; transform: scale(1); }
+
+  .task-content { flex: 1; min-width: 0; }
+  .task-label { font-size:16px; font-weight:500; color:var(--text); transition:color 0.3s; line-height:1.3; display:block; }
+  .task-card.done .task-label { color:var(--muted); text-decoration:line-through; text-decoration-color:rgba(200,241,53,0.4); }
+  .task-sub { font-size:12px; color:#3a3a52; margin-top:3px; font-weight:400; }
+  .task-card.done .task-sub { color:#2a2a3a; }
+  .task-emoji-wrap { font-size:26px; margin-right:12px; flex-shrink:0; width:36px; text-align:center; transition:transform 0.35s cubic-bezier(0.34,1.56,0.64,1); }
+  .task-card.done .task-emoji-wrap { transform: scale(1.15) rotate(5deg); }
+
+  /* Streak bar */
+  .streak-bar {
+    margin: 0 16px; padding: 16px;
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    display: flex; justify-content: space-between; align-items: center;
+    position: relative; z-index: 1;
+  }
+  .streak-item { text-align: center; flex: 1; }
+  .streak-item + .streak-item { border-left: 1px solid var(--border); }
+  .streak-val { font-family:'Syne',sans-serif; font-size:22px; font-weight:800; color:var(--accent); }
+  .streak-label { font-size:11px; color:var(--muted); font-weight:500; text-transform:uppercase; letter-spacing:0.06em; }
+
+  .reset-btn {
+    display: block; margin: 14px auto;
+    padding: 10px 24px;
+    background: transparent; border: 1.5px solid var(--border);
+    border-radius: 30px; color: var(--muted);
+    font-family: 'DM Sans', sans-serif; font-size: 13px;
+    cursor: pointer; transition: all 0.2s;
+    position: relative; z-index: 1;
+  }
+  .reset-btn:hover { border-color: var(--muted); color: var(--text); }
+
+  /* Week dots */
+  .week-row { display:flex; justify-content:center; gap:8px; padding:0 16px 14px; position:relative; z-index:1; }
+  .week-dot { width:10px; height:10px; border-radius:50%; background:var(--border); }
+  .week-dot.today { border: 2px solid var(--muted); background: transparent; }
+  .week-dot.complete { background: var(--accent); }
+  .week-dot-label { font-size:9px; color:var(--muted); text-align:center; margin-top:3px; font-weight:500; letter-spacing:0.05em; }
+  .week-col { display:flex; flex-direction:column; align-items:center; }
+
+  /* Celebration */
+  .celebration {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100; pointer-events: none; opacity: 0;
+    transition: opacity 0.5s;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+  }
+  .celebration.show { opacity: 1; pointer-events: all; }
+  .celebration-inner {
+    background: var(--surface); border: 2px solid var(--accent);
+    border-radius: 28px; padding: 40px 36px; text-align: center;
+    box-shadow: 0 0 80px rgba(200,241,53,0.2);
+    transform: scale(0.85);
+    transition: transform 0.5s cubic-bezier(0.34,1.56,0.64,1);
+    margin: 24px;
+  }
+  .celebration.show .celebration-inner { transform: scale(1); }
+  .celebration-emoji { font-size:56px; display:block; margin-bottom:12px; }
+  .celebration h2 { font-family:'Syne',sans-serif; font-size:26px; font-weight:800; color:var(--accent); margin-bottom:8px; }
+  .celebration p { font-size:14px; color:var(--muted); margin-bottom:24px; }
+  .celebration button {
+    background: var(--accent); color: var(--bg);
+    border: none; border-radius: 30px; padding: 14px 32px;
+    font-family: 'Syne', sans-serif; font-weight: 700; font-size: 15px;
+    cursor: pointer; pointer-events: all;
+  }
+
+  .confetti-dot {
+    position: fixed; width: 8px; height: 8px; border-radius: 2px;
+    animation: confetti-fall 1.5s ease-in forwards;
+    pointer-events: none; z-index: 99;
+  }
+  @keyframes confetti-fall {
+    0%   { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="bg-glow" id="bgGlow"></div>
+<div class="app">
+  <header>
+    <div class="header-left">
+      <div class="date-label" id="dateLabel"></div>
+      <h1>Daily <span>5</span></h1>
+    </div>
+    <button class="notif-btn" id="notifBtn" onclick="toggleNotifPanel()">
+      <span class="bell">🔔</span>
+      <span id="notifBtnLabel">Reminders</span>
+    </button>
+  </header>
+
+  <!-- Notification setup panel -->
+  <div class="notif-panel" id="notifPanel">
+    <div class="notif-inner">
+      <h3>Daily Push Reminder</h3>
+      <p>
+        Get an iPhone notification if you haven't finished your habits by the chosen time.<br>
+        <strong>⚠️ Requires Safari + "Add to Home Screen".</strong>
+        You'll be prompted to allow notifications when you tap Enable.
+      </p>
+      <div class="time-row">
+        <span class="time-label">Remind me at</span>
+        <input type="time" class="time-input" id="reminderTime" value="20:00">
+      </div>
+      <div class="notif-actions">
+        <button class="btn-enable" onclick="enableNotifications()">Enable Reminder</button>
+        <button class="btn-disable" onclick="disableNotifications()">Turn Off</button>
+      </div>
+      <div class="notif-status" id="notifStatus"></div>
+    </div>
+  </div>
+
+  <div class="progress-section">
+    <div class="ring-wrap">
+      <svg width="80" height="80" viewBox="0 0 80 80">
+        <circle class="ring-bg" cx="40" cy="40" r="35"/>
+        <circle class="ring-fill" id="ringFill" cx="40" cy="40" r="35"/>
+      </svg>
+      <div class="ring-count">
+        <span class="num" id="ringNum">0</span>
+        <span class="denom">of 5</span>
+      </div>
+    </div>
+    <div class="progress-text">
+      <div class="headline" id="progressHeadline">Let's get started</div>
+      <div class="sub" id="progressSub">Tap any habit card to mark it done.</div>
+    </div>
+  </div>
+
+  <div class="tasks" id="taskList"></div>
+
+  <div class="streak-bar">
+    <div class="streak-item">
+      <div class="streak-val" id="streakVal">0</div>
+      <div class="streak-label">Day Streak 🔥</div>
+    </div>
+    <div class="streak-item">
+      <div class="streak-val" id="totalVal">0</div>
+      <div class="streak-label">Days Won</div>
+    </div>
+    <div class="streak-item">
+      <div class="streak-val" id="bestVal">0</div>
+      <div class="streak-label">Best Streak</div>
+    </div>
+  </div>
+
+  <div class="week-row" id="weekRow"></div>
+  <button class="reset-btn" onclick="resetDay()">Reset Today</button>
+</div>
+
+<div class="celebration" id="celebration">
+  <div class="celebration-inner">
+    <span class="celebration-emoji">🏆</span>
+    <h2>Day Won!</h2>
+    <p>You completed all 5 habits.<br>That's what champions do.</p>
+    <button onclick="dismissCelebration()">Keep Going →</button>
+  </div>
+</div>
+
+<script>
+// ─── Data ────────────────────────────────────────────────────────────────────
+const DEFAULT_TASKS = [
+  { id:1, name:'Go to gym',         emoji:'🏋️', done:false },
+  { id:2, name:'Walk 10,000 steps', emoji:'👟', done:false },
+  { id:3, name:'Run 10K',           emoji:'🏃', done:false },
+  { id:4, name:'Read for 1 hour',   emoji:'📖', done:false },
+  { id:5, name:'Cook own dinner',   emoji:'🍳', done:false },
+];
+
+const TASK_SUBS = [
+  'Hit the weights or a class 💪',
+  'Track with your phone or watch',
+  'Lace up and hit the pavement',
+  'No screens, just pages',
+  'No takeout, no delivery 🥘',
+];
+
+const MESSAGES = [
+  ["Let's get started",  "Tap any habit card to mark it done."],
+  ["You're moving!",     "One down. Keep the momentum going."],
+  ["Halfway there!",     "You're building something real."],
+  ["So close now!",      "Don't stop — the finish line is in sight."],
+  ["One more!",          "Last one. Make it count."],
+  ["Day won! 🏆",        "You did all 5. Incredible."],
+];
+
+// ─── State ───────────────────────────────────────────────────────────────────
+function today() { return new Date().toISOString().slice(0,10); }
+
+function initState() {
+  return { tasks: DEFAULT_TASKS.map(t=>({...t})), date:today(), streak:0, best:0, totalWins:0, history:[] };
+}
+
+function newDay(prev) {
+  const wasComplete = prev.tasks.every(t=>t.done);
+  const newStreak   = wasComplete ? (prev.streak||0)+1 : 0;
+  const history     = [...(prev.history||[])];
+  history.push({ date:prev.date, complete:wasComplete });
+  if (history.length > 7) history.shift();
+  return {
+    tasks: prev.tasks.map(t=>({...t,done:false})),
+    date: today(),
+    streak: newStreak,
+    best: Math.max(prev.best||0, newStreak),
+    totalWins: wasComplete ? (prev.totalWins||0)+1 : (prev.totalWins||0),
+    history,
+  };
+}
+
+function getState() {
+  try {
+    const s = JSON.parse(localStorage.getItem('daily5_v3')||'null');
+    if (!s) return initState();
+    if (s.date !== today()) return newDay(s);
+    return s;
+  } catch(e) { return initState(); }
+}
+
+function saveState(s) { localStorage.setItem('daily5_v3', JSON.stringify(s)); }
+
+let state = getState();
+let celebrationShown = false;
+
+// ─── Render ──────────────────────────────────────────────────────────────────
+function render() {
+  renderHeader();
+  renderProgress();
+  renderTasks();
+  renderStats();
+  renderWeek();
+  updateNotifButton();
+}
+
+function renderHeader() {
+  const d = new Date();
+  const days   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('dateLabel').textContent = `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
+}
+
+function renderProgress() {
+  const done = state.tasks.filter(t=>t.done).length;
+  document.getElementById('ringFill').style.strokeDashoffset = 220-(done/5)*220;
+  document.getElementById('ringNum').textContent = done;
+  const [headline, sub] = MESSAGES[done];
+  document.getElementById('progressHeadline').textContent = headline;
+  document.getElementById('progressSub').textContent      = sub;
+  document.getElementById('bgGlow').className = done===5 ? 'bg-glow complete' : 'bg-glow';
+}
+
+function renderTasks() {
+  const allDone = state.tasks.every(t=>t.done);
+  const list = document.getElementById('taskList');
+  list.innerHTML = '';
+  state.tasks.forEach((task, i) => {
+    const card = document.createElement('div');
+    const shouldPulse = !task.done && !allDone;
+    card.className = 'task-card' + (task.done ? ' done' : '') + (shouldPulse ? ' pulsing' : '');
+    card.setAttribute('role','button');
+    card.setAttribute('aria-pressed', task.done ? 'true' : 'false');
+    card.setAttribute('aria-label', task.name);
+    card.onclick = () => toggle(i);
+    card.innerHTML = `
+      <div class="accent-bar"></div>
+      <div class="urgency-bar"></div>
+      <div class="check-circle">
+        <svg class="check-icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <div class="task-emoji-wrap">${task.emoji}</div>
+      <div class="task-content">
+        <span class="task-label">${escHtml(task.name)}</span>
+        <div class="task-sub">${TASK_SUBS[i]||''}</div>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderStats() {
+  document.getElementById('streakVal').textContent = state.streak;
+  document.getElementById('totalVal').textContent  = state.totalWins;
+  document.getElementById('bestVal').textContent   = state.best;
+}
+
+function renderWeek() {
+  const row = document.getElementById('weekRow');
+  row.innerHTML = '';
+  const dayLetters = ['S','M','T','W','T','F','S'];
+  for (let i=6; i>=0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate()-i);
+    const dateStr  = d.toISOString().slice(0,10);
+    const isToday  = i===0;
+    const histEntry = state.history.find(h=>h.date===dateStr);
+    const col = document.createElement('div');
+    col.className = 'week-col';
+    col.innerHTML = `
+      <div class="week-dot ${isToday?'today':''} ${histEntry?.complete&&!isToday?'complete':''}"></div>
+      <div class="week-dot-label">${dayLetters[d.getDay()]}</div>
+    `;
+    row.appendChild(col);
+  }
+}
+
+// ─── Actions ─────────────────────────────────────────────────────────────────
+function toggle(i) {
+  state.tasks[i].done = !state.tasks[i].done;
+  saveState(state);
+  render();
+  if (state.tasks.every(t=>t.done) && !celebrationShown) {
+    celebrationShown = true;
+    setTimeout(showCelebration, 400);
+  }
+}
+
+function showCelebration() {
+  document.getElementById('celebration').classList.add('show');
+  spawnConfetti();
+  state.totalWins = (state.totalWins||0)+1;
+  state.streak    = (state.streak||0)+1;
+  state.best      = Math.max(state.best||0, state.streak);
+  saveState(state);
+  renderStats();
+}
+
+function dismissCelebration() {
+  document.getElementById('celebration').classList.remove('show');
+}
+
+function spawnConfetti() {
+  const colors = ['#c8f135','#ffffff','#9ab828','#e0ff7a','#ff5c3a'];
+  for (let i=0; i<40; i++) {
+    setTimeout(()=>{
+      const dot = document.createElement('div');
+      dot.className = 'confetti-dot';
+      dot.style.cssText = `left:${Math.random()*100}vw;top:-10px;background:${colors[i%colors.length]};animation-duration:${1+Math.random()}s;animation-delay:${Math.random()*0.5}s`;
+      document.body.appendChild(dot);
+      setTimeout(()=>dot.remove(), 2500);
+    }, i*30);
+  }
+}
+
+function resetDay() {
+  if (!confirm('Reset all habits for today?')) return;
+  state.tasks = state.tasks.map(t=>({...t,done:false}));
+  celebrationShown = false;
+  saveState(state);
+  render();
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+let notifPanelOpen = false;
+
+function toggleNotifPanel() {
+  notifPanelOpen = !notifPanelOpen;
+  document.getElementById('notifPanel').classList.toggle('open', notifPanelOpen);
+  const saved = localStorage.getItem('daily5_reminder_time');
+  if (saved) document.getElementById('reminderTime').value = saved;
+}
+
+function updateNotifButton() {
+  const enabled = localStorage.getItem('daily5_notif_enabled') === 'true';
+  document.getElementById('notifBtn').classList.toggle('active', enabled);
+  document.getElementById('notifBtnLabel').textContent = enabled ? 'On ✓' : 'Reminders';
+}
+
+async function enableNotifications() {
+  if (!('Notification' in window)) {
+    showNotifStatus('err', '❌ Notifications not supported. Use Safari and "Add to Home Screen".');
+    return;
+  }
+
+  let perm = Notification.permission;
+  if (perm === 'default') perm = await Notification.requestPermission();
+
+  if (perm !== 'granted') {
+    showNotifStatus('err', '❌ Notifications blocked. Go to: iPhone Settings → [Your Site] → Notifications → Allow.');
+    return;
+  }
+
+  const time = document.getElementById('reminderTime').value;
+  localStorage.setItem('daily5_reminder_time', time);
+  localStorage.setItem('daily5_notif_enabled', 'true');
+  updateNotifButton();
+  scheduleNotification(time);
+
+  const [h,m] = time.split(':');
+  const h12 = ((+h%12)||12);
+  const ampm = +h < 12 ? 'AM' : 'PM';
+  showNotifStatus('ok', `✅ Reminder set for ${h12}:${m} ${ampm} every day. If habits are all done by then, no notification will fire.`);
+}
+
+function disableNotifications() {
+  localStorage.setItem('daily5_notif_enabled', 'false');
+  if (window._daily5Timer) { clearTimeout(window._daily5Timer); window._daily5Timer = null; }
+  updateNotifButton();
+  showNotifStatus('ok', 'Reminder turned off.');
+}
+
+function showNotifStatus(type, msg) {
+  const el = document.getElementById('notifStatus');
+  el.className = 'notif-status ' + type;
+  el.textContent = msg;
+}
+
+function scheduleNotification(timeStr) {
+  if (window._daily5Timer) clearTimeout(window._daily5Timer);
+  const [h,m]  = timeStr.split(':').map(Number);
+  const fire   = new Date();
+  fire.setHours(h, m, 0, 0);
+  if (fire <= new Date()) fire.setDate(fire.getDate()+1);
+
+  window._daily5Timer = setTimeout(()=>{
+    const enabled = localStorage.getItem('daily5_notif_enabled') === 'true';
+    if (!enabled || Notification.permission !== 'granted') return;
+    const s = getState();
+    const remaining = s.tasks.filter(t=>!t.done).length;
+    if (remaining > 0) {
+      const n = new Notification('Daily 5 ⚡', {
+        body: remaining === 5
+          ? "You haven't started today's habits. Let's go! 💪"
+          : `${remaining} habit${remaining>1?'s':''} left today. Don't break your streak! 🔥`,
+        tag: 'daily5-reminder',
+        requireInteraction: false,
+      });
+      n.onclick = ()=>{ window.focus(); n.close(); };
+    }
+    scheduleNotification(timeStr); // reschedule for tomorrow
+  }, fire - new Date());
+}
+
+function restoreNotification() {
+  const enabled = localStorage.getItem('daily5_notif_enabled') === 'true';
+  const time    = localStorage.getItem('daily5_reminder_time');
+  if (enabled && time && Notification.permission === 'granted') {
+    scheduleNotification(time);
+  }
+}
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+render();
+restoreNotification();
+</script>
+</body>
+</html>
